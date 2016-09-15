@@ -17,14 +17,15 @@ dependencies:
     - rm -rf node_modules
     - npm install -g npm
     - npm install
+    - cd ${GOPATH}/src/{REPO_PATH}
 
 test:
   override:
-     - test -z "$(gofmt -s -l ./pkg/... | tee /dev/stderr)"
-     - go vet ./pkg/...
+     #- test -z "$(gofmt -s -l ./pkg/... | tee /dev/stderr)"
+     #- go vet ./pkg/...
      # JS tests
-     - npm test
-     - npm run coveralls
+     #- npm test
+     #- npm run coveralls
      # GO tests
      - go test -v ./pkg/...
 
