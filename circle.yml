@@ -18,6 +18,7 @@ dependencies:
     - npm install -g npm
     - npm install
     - cd ${GOPATH}/src/${REPO_PATH}
+    - pwd
 
 test:
   override:
