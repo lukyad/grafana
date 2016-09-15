@@ -17,7 +17,7 @@ dependencies:
     - rm -rf node_modules
     - npm install -g npm
     - npm install
-    - cd ${GOPATH}/src/{REPO_PATH}
+    - cd ${GOPATH}/src/${REPO_PATH}
 
 test:
   override:
