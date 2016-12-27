@@ -27,10 +27,19 @@ export class DynamicDashboardSrv {
     this.iteration = (this.iteration || new Date().getTime()) + 1;
 
     var cleanUpOnly = options.cleanUpOnly;
-
     var i, j, row, panel;
+
+    // cleanup scopedVars
     for (i = 0; i < this.dashboard.rows.length; i++) {
       row = this.dashboard.rows[i];
+      for (j = 0; j < row.panels.length; j++) {
+        delete row.panels[j].scopedVars;
+      }
+    }
+
+    for (i = 0; i < this.dashboard.rows.length; i++) {
+      row = this.dashboard.rows[i];
+
       // handle row repeats
       if (row.repeat) {
         if (!cleanUpOnly) {
@@ -54,8 +63,6 @@ export class DynamicDashboardSrv {
           // clean up old left overs
           row.panels = _.without(row.panels, panel);
           j = j - 1;
-        } else if (!_.isEmpty(panel.scopedVars) && panel.repeatIteration !== this.iteration) {
-          panel.scopedVars = {};
         }
       }
     }
@@ -99,7 +106,7 @@ export class DynamicDashboardSrv {
   // returns a new row clone or reuses a clone from previous iteration
   repeatRow(row, rowIndex) {
     var variables = this.dashboard.templating.list;
-    var variable = _.findWhere(variables, {name: row.repeat});
+    var variable = _.find(variables, {name: row.repeat});
     if (!variable) {
       return;
     }
@@ -120,7 +127,6 @@ export class DynamicDashboardSrv {
         panel = copy.panels[i];
         panel.scopedVars = {};
         panel.scopedVars[variable.name] = option;
-        panel.repeatIteration = this.iteration;
       }
     });
   }
@@ -161,7 +167,7 @@ export class DynamicDashboardSrv {
 
   repeatPanel(panel, row) {
     var variables = this.dashboard.templating.list;
-    var variable = _.findWhere(variables, {name: panel.repeat});
+    var variable = _.find(variables, {name: panel.repeat});
     if (!variable) { return; }
 
     var selected;
@@ -173,7 +179,7 @@ export class DynamicDashboardSrv {
 
     _.each(selected, (option, index) => {
       var copy = this.getPanelClone(panel, row, index);
-      copy.span = Math.max(12 / selected.length, panel.minSpan);
+      copy.span = Math.max(12 / selected.length, panel.minSpan || 4);
       copy.scopedVars = copy.scopedVars || {};
       copy.scopedVars[variable.name] = option;
     });

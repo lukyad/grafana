@@ -1,6 +1,8 @@
 package api
 
 import (
+	"strings"
+
 	"github.com/grafana/grafana/pkg/api/dtos"
 	"github.com/grafana/grafana/pkg/bus"
 	"github.com/grafana/grafana/pkg/middleware"
@@ -21,6 +23,15 @@ func setIndexViewData(c *middleware.Context) (*dtos.IndexViewData, error) {
 	}
 	prefs := prefsQuery.Result
 
+	// Read locale from acccept-language
+	acceptLang := c.Req.Header.Get("Accept-Language")
+	locale := "en-US"
+
+	if len(acceptLang) > 0 {
+		parts := strings.Split(acceptLang, ",")
+		locale = parts[0]
+	}
+
 	var data = dtos.IndexViewData{
 		User: &dtos.CurrentUser{
 			Id:             c.UserId,
@@ -35,6 +46,7 @@ func setIndexViewData(c *middleware.Context) (*dtos.IndexViewData, error) {
 			IsGrafanaAdmin: c.IsGrafanaAdmin,
 			LightTheme:     prefs.Theme == "light",
 			Timezone:       prefs.Timezone,
+			Locale:         locale,
 		},
 		Settings:                settings,
 		AppUrl:                  setting.AppUrl,
@@ -78,6 +90,20 @@ func setIndexViewData(c *middleware.Context) (*dtos.IndexViewData, error) {
 		Url:      setting.AppSubUrl + "/",
 		Children: dashboardChildNavs,
 	})
+
+	if setting.AlertingEnabled && (c.OrgRole == m.ROLE_ADMIN || c.OrgRole == m.ROLE_EDITOR) {
+		alertChildNavs := []*dtos.NavLink{
+			{Text: "Alert List", Url: setting.AppSubUrl + "/alerting/list"},
+			{Text: "Notifications", Url: setting.AppSubUrl + "/alerting/notifications"},
+		}
+
+		data.MainNavLinks = append(data.MainNavLinks, &dtos.NavLink{
+			Text:     "Alerting",
+			Icon:     "icon-gf icon-gf-alert",
+			Url:      setting.AppSubUrl + "/alerting/list",
+			Children: alertChildNavs,
+		})
+	}
 
 	if c.OrgRole == m.ROLE_ADMIN {
 		data.MainNavLinks = append(data.MainNavLinks, &dtos.NavLink{

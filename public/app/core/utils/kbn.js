@@ -368,18 +368,42 @@ function($, _, moment) {
     return kbn.toFixed(100*size, decimals) + '%';
   };
 
+  /* Formats the value to hex. Uses float if specified decimals are not 0.
+   * There are two options, one with 0x, and one without */
+
+  kbn.valueFormats.hex = function(value, decimals) {
+    if (value == null) { return ""; }
+    return parseFloat(kbn.toFixed(value, decimals)).toString(16).toUpperCase();
+  };
+
+  kbn.valueFormats.hex0x = function(value, decimals) {
+    if (value == null) { return ""; }
+    var hexString = kbn.valueFormats.hex(value, decimals);
+    if (hexString.substring(0,1) === "-") {
+      return "-0x" + hexString.substring(1);
+    }
+    return "0x" + hexString;
+  };
+
   // Currencies
   kbn.valueFormats.currencyUSD = kbn.formatBuilders.currency('$');
   kbn.valueFormats.currencyGBP = kbn.formatBuilders.currency('£');
   kbn.valueFormats.currencyEUR = kbn.formatBuilders.currency('€');
   kbn.valueFormats.currencyJPY = kbn.formatBuilders.currency('¥');
 
-  // Data
+  // Data (Binary)
   kbn.valueFormats.bits   = kbn.formatBuilders.binarySIPrefix('b');
   kbn.valueFormats.bytes  = kbn.formatBuilders.binarySIPrefix('B');
   kbn.valueFormats.kbytes = kbn.formatBuilders.binarySIPrefix('B', 1);
   kbn.valueFormats.mbytes = kbn.formatBuilders.binarySIPrefix('B', 2);
   kbn.valueFormats.gbytes = kbn.formatBuilders.binarySIPrefix('B', 3);
+
+  // Data (Decimal)
+  kbn.valueFormats.decbits   = kbn.formatBuilders.decimalSIPrefix('b');
+  kbn.valueFormats.decbytes  = kbn.formatBuilders.decimalSIPrefix('B');
+  kbn.valueFormats.deckbytes = kbn.formatBuilders.decimalSIPrefix('B', 1);
+  kbn.valueFormats.decmbytes = kbn.formatBuilders.decimalSIPrefix('B', 2);
+  kbn.valueFormats.decgbytes = kbn.formatBuilders.decimalSIPrefix('B', 3);
 
   // Data Rate
   kbn.valueFormats.pps    = kbn.formatBuilders.decimalSIPrefix('pps');
@@ -397,6 +421,9 @@ function($, _, moment) {
   kbn.valueFormats.rps  = kbn.formatBuilders.simpleCountUnit('rps');
   kbn.valueFormats.wps  = kbn.formatBuilders.simpleCountUnit('wps');
   kbn.valueFormats.iops = kbn.formatBuilders.simpleCountUnit('iops');
+  kbn.valueFormats.opm = kbn.formatBuilders.simpleCountUnit('opm');
+  kbn.valueFormats.rpm = kbn.formatBuilders.simpleCountUnit('rpm');
+  kbn.valueFormats.wpm = kbn.formatBuilders.simpleCountUnit('wpm');
 
   // Energy
   kbn.valueFormats.watt         = kbn.formatBuilders.decimalSIPrefix('W');
@@ -472,6 +499,19 @@ function($, _, moment) {
 
   kbn.valueFormats.s = function(size, decimals, scaledDecimals) {
     if (size === null) { return ""; }
+
+    // Less than 1 µs, devide in ns
+    if (Math.abs(size) < 0.000001) {
+      return kbn.toFixedScaled(size * 1.e9, decimals, scaledDecimals - decimals, -9, " ns");
+    }
+    // Less than 1 ms, devide in µs
+    if (Math.abs(size) < 0.001) {
+      return kbn.toFixedScaled(size * 1.e6, decimals, scaledDecimals - decimals, -6, " µs");
+    }
+    // Less than 1 second, devide in ms
+    if (Math.abs(size) < 1) {
+      return kbn.toFixedScaled(size * 1.e3, decimals, scaledDecimals - decimals, -3, " ms");
+    }
 
     if (Math.abs(size) < 60) {
       return kbn.toFixed(size, decimals) + " s";
@@ -607,6 +647,8 @@ function($, _, moment) {
           {text: 'Humidity (%H)',     value: 'humidity'   },
           {text: 'ppm',               value: 'ppm'        },
           {text: 'decibel',           value: 'dB'         },
+          {text: 'hexadecimal (0x)',  value: 'hex0x'      },
+          {text: 'hexadecimal',       value: 'hex'        },
         ]
       },
       {
@@ -634,13 +676,23 @@ function($, _, moment) {
         ]
       },
       {
-        text: 'data',
+        text: 'data (IEC)',
         submenu: [
           {text: 'bits',      value: 'bits'  },
           {text: 'bytes',     value: 'bytes' },
-          {text: 'kilobytes', value: 'kbytes'},
-          {text: 'megabytes', value: 'mbytes'},
-          {text: 'gigabytes', value: 'gbytes'},
+          {text: 'kibibytes', value: 'kbytes'},
+          {text: 'mebibytes', value: 'mbytes'},
+          {text: 'gibibytes', value: 'gbytes'},
+        ]
+      },
+      {
+        text: 'data (Metric)',
+        submenu: [
+          {text: 'bits',      value: 'decbits'  },
+          {text: 'bytes',     value: 'decbytes' },
+          {text: 'kilobytes', value: 'deckbytes'},
+          {text: 'megabytes', value: 'decmbytes'},
+          {text: 'gigabytes', value: 'decgbytes'},
         ]
       },
       {
@@ -664,6 +716,9 @@ function($, _, moment) {
           {text: 'reads/sec (rps)',     value: 'rps' },
           {text: 'writes/sec (wps)',    value: 'wps' },
           {text: 'I/O ops/sec (iops)',  value: 'iops'},
+          {text: 'ops/min (opm)',       value: 'opm' },
+          {text: 'reads/min (rpm)',     value: 'rpm' },
+          {text: 'writes/min (wpm)',    value: 'wpm' },
         ]
       },
       {

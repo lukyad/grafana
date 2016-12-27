@@ -22,13 +22,13 @@ Stable .deb for Debian-based Linux | [3.1.1 (x86-64 deb)](https://grafanarel.s3.
 
 Add the following line to your `/etc/apt/sources.list` file.
 
-    deb https://packagecloud.io/grafana/stable/debian/ wheezy main
+    deb https://packagecloud.io/grafana/stable/debian/ jessie main
 
 Use the above line even if you are on Ubuntu or another Debian version.
 There is also a testing repository if you want beta or release
 candidates.
 
-    deb https://packagecloud.io/grafana/testing/debian/ wheezy main
+    deb https://packagecloud.io/grafana/testing/debian/ jessie main
 
 Then add the [Package Cloud](https://packagecloud.io/grafana) key. This
 allows you to install signed packages.

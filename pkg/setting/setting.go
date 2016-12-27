@@ -47,10 +47,11 @@ var (
 	BuildStamp   int64
 
 	// Paths
-	LogsPath    string
-	HomePath    string
-	DataPath    string
-	PluginsPath string
+	LogsPath       string
+	HomePath       string
+	DataPath       string
+	PluginsPath    string
+	CustomInitPath = "conf/custom.ini"
 
 	// Log settings.
 	LogModes   []string
@@ -89,6 +90,7 @@ var (
 	VerifyEmailEnabled bool
 	LoginHint          string
 	DefaultTheme       string
+	AllowUserPassLogin bool
 
 	// Http auth
 	AdminUser     string
@@ -139,11 +141,21 @@ var (
 	// QUOTA
 	Quota QuotaSettings
 
+	// Alerting
+	AlertingEnabled bool
+
 	// logger
 	logger log.Logger
 
 	// Grafana.NET URL
 	GrafanaNetUrl string
+
+	// S3 temp image store
+	S3TempImageStoreBucketUrl string
+	S3TempImageStoreAccessKey string
+	S3TempImageStoreSecretKey string
+
+	ImageUploadProvider string
 )
 
 type CommandLineArgs struct {
@@ -179,7 +191,12 @@ func ToAbsUrl(relativeUrl string) string {
 
 func shouldRedactKey(s string) bool {
 	uppercased := strings.ToUpper(s)
-	return strings.Contains(uppercased, "PASSWORD") || strings.Contains(uppercased, "SECRET")
+	return strings.Contains(uppercased, "PASSWORD") || strings.Contains(uppercased, "SECRET") || strings.Contains(uppercased, "PROVIDER_CONFIG")
+}
+
+func shouldRedactURLKey(s string) bool {
+	uppercased := strings.ToUpper(s)
+	return strings.Contains(uppercased, "DATABASE_URL")
 }
 
 func applyEnvVariableOverrides() {
@@ -195,6 +212,17 @@ func applyEnvVariableOverrides() {
 				key.SetValue(envValue)
 				if shouldRedactKey(envKey) {
 					envValue = "*********"
+				}
+				if shouldRedactURLKey(envKey) {
+					u, _ := url.Parse(envValue)
+					ui := u.User
+					if ui != nil {
+						_, exists := ui.Password()
+						if exists {
+							u.User = url.UserPassword(ui.Username(), "-redacted-")
+							envValue = u.String()
+						}
+					}
 				}
 				appliedEnvOverrides = append(appliedEnvOverrides, fmt.Sprintf("%s=%s", envKey, envValue))
 			}
@@ -283,19 +311,19 @@ func evalConfigValues() {
 	}
 }
 
-func loadSpecifedConfigFile(configFile string) {
+func loadSpecifedConfigFile(configFile string) error {
 	if configFile == "" {
-		configFile = filepath.Join(HomePath, "conf/custom.ini")
+		configFile = filepath.Join(HomePath, CustomInitPath)
 		// return without error if custom file does not exist
 		if !pathExists(configFile) {
-			return
+			return nil
 		}
 	}
 
 	userConfig, err := ini.Load(configFile)
 	userConfig.BlockMode = false
 	if err != nil {
-		log.Fatal(3, "Failed to parse %v, %v", configFile, err)
+		return fmt.Errorf("Failed to parse %v, %v", configFile, err)
 	}
 
 	for _, section := range userConfig.Sections() {
@@ -317,6 +345,7 @@ func loadSpecifedConfigFile(configFile string) {
 	}
 
 	configFiles = append(configFiles, configFile)
+	return nil
 }
 
 func loadConfiguration(args *CommandLineArgs) {
@@ -338,12 +367,12 @@ func loadConfiguration(args *CommandLineArgs) {
 	// load default overrides
 	applyCommandLineDefaultProperties(commandLineProps)
 
-	// init logging before specific config so we can log errors from here on
-	DataPath = makeAbsolute(Cfg.Section("paths").Key("data").String(), HomePath)
-	initLogging()
-
 	// load specified config file
-	loadSpecifedConfigFile(args.Config)
+	err = loadSpecifedConfigFile(args.Config)
+	if err != nil {
+		initLogging()
+		log.Fatal(3, err.Error())
+	}
 
 	// apply environment overrides
 	applyEnvVariableOverrides()
@@ -485,6 +514,7 @@ func NewConfigContext(args *CommandLineArgs) error {
 	VerifyEmailEnabled = users.Key("verify_email_enabled").MustBool(false)
 	LoginHint = users.Key("login_hint").String()
 	DefaultTheme = users.Key("default_theme").String()
+	AllowUserPassLogin = users.Key("allow_user_pass_login").MustBool(true)
 
 	// anonymous access
 	AnonymousEnabled = Cfg.Section("auth.anonymous").Key("enabled").MustBool(false)
@@ -515,6 +545,9 @@ func NewConfigContext(args *CommandLineArgs) error {
 	LdapEnabled = ldapSec.Key("enabled").MustBool(false)
 	LdapConfigFile = ldapSec.Key("config_file").String()
 
+	alerting := Cfg.Section("alerting")
+	AlertingEnabled = alerting.Key("enabled").MustBool(false)
+
 	readSessionConfig()
 	readSmtpSettings()
 	readQuotaSettings()
@@ -525,6 +558,8 @@ func NewConfigContext(args *CommandLineArgs) error {
 
 	GrafanaNetUrl = Cfg.Section("grafana.net").Key("url").MustString("https://grafana.net")
 
+	imageUploadingSection := Cfg.Section("external_image_storage")
+	ImageUploadProvider = imageUploadingSection.Key("provider").MustString("internal")
 	return nil
 }
 

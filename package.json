@@ -4,14 +4,14 @@
     "company": "Coding Instinct AB"
   },
   "name": "grafana",
-  "version": "3.1.1",
+  "version": "4.0.0-pre1",
   "repository": {
     "type": "git",
     "url": "http://github.com/grafana/grafana.git"
   },
   "devDependencies": {
     "zone.js": "^0.6.6",
-    "autoprefixer": "^6.3.3",
+    "autoprefixer": "^6.4.0",
     "es6-promise": "^3.0.2",
     "es6-shim": "^0.35.1",
     "expect.js": "~0.2.0",
@@ -57,7 +57,7 @@
     "systemjs": "0.19.24"
   },
   "engines": {
-    "node": "0.4.x",
+    "node": "4.x",
     "npm": "2.14.x"
   },
   "scripts": {

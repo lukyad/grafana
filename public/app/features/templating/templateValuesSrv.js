@@ -1,9 +1,10 @@
 define([
   'angular',
   'lodash',
+  'jquery',
   'app/core/utils/kbn',
 ],
-function (angular, _, kbn) {
+function (angular, _, $, kbn) {
   'use strict';
 
   var module = angular.module('grafana.services');
@@ -18,7 +19,7 @@ function (angular, _, kbn) {
     $rootScope.onAppEvent('refresh', function() {
 
       // look for interval variables
-      var intervalVariable = _.findWhere(self.variables, { type: 'interval' });
+      var intervalVariable = _.find(self.variables, { type: 'interval' });
       if (intervalVariable) {
         self.updateAutoInterval(intervalVariable);
       }
@@ -28,7 +29,16 @@ function (angular, _, kbn) {
         .filter(function(variable) {
           return variable.refresh === 2;
         }).map(function(variable) {
-          return self.updateOptions(variable);
+          var previousOptions = variable.options.slice();
+
+          return self.updateOptions(variable).then(function () {
+            return self.variableUpdated(variable).then(function () {
+              // check if current options changed due to refresh
+              if (angular.toJson(previousOptions) !== angular.toJson(variable.options)) {
+                $rootScope.appEvent('template-variable-value-updated');
+              }
+            });
+          });
         });
 
       return $q.all(promises);
@@ -36,6 +46,7 @@ function (angular, _, kbn) {
     }, $rootScope);
 
     this.init = function(dashboard) {
+      this.dashboard = dashboard;
       this.variables = dashboard.templating.list;
       templateSrv.init(this.variables);
 
@@ -142,7 +153,7 @@ function (angular, _, kbn) {
 
     this.variableUpdated = function(variable) {
       templateSrv.updateTemplateData();
-      return this.updateOptionsInChildVariables(variable);
+      return self.updateOptionsInChildVariables(variable);
     };
 
     this.updateOptionsInChildVariables = function(updatedVariable) {
@@ -155,7 +166,9 @@ function (angular, _, kbn) {
         if (otherVariable === updatedVariable) {
           return;
         }
-        if (templateSrv.containsVariable(otherVariable.query, updatedVariable.name) ||
+        if ((otherVariable.type === "datasource" &&
+            templateSrv.containsVariable(otherVariable.regex, updatedVariable.name)) ||
+            templateSrv.containsVariable(otherVariable.query, updatedVariable.name) ||
             templateSrv.containsVariable(otherVariable.datasource, updatedVariable.name)) {
           return self.updateOptions(otherVariable);
         }
@@ -277,7 +290,7 @@ function (angular, _, kbn) {
 
         return self.setVariableValue(variable, selected, false);
       } else {
-        var currentOption = _.findWhere(variable.options, {text: variable.current.text});
+        var currentOption = _.find(variable.options, {text: variable.current.text});
         if (currentOption) {
           return self.setVariableValue(variable, currentOption, false);
         } else {
@@ -329,7 +342,7 @@ function (angular, _, kbn) {
 
     this.metricNamesToVariableValues = function(variable, metricNames) {
       var regex, options, i, matches;
-      options = {}; // use object hash to remove duplicates
+      options = [];
 
       if (variable.regex) {
         regex = kbn.stringToJsRegex(templateSrv.replace(variable.regex));
@@ -357,14 +370,41 @@ function (angular, _, kbn) {
           }
         }
 
-        options[value] = {text: text, value: value};
+        options.push({text: text, value: value});
       }
 
-      return _.sortBy(options, 'text');
+      options = _.uniq(options, 'value');
+      return this.sortVariableValues(options, variable.sort);
     };
 
     this.addAllOption = function(variable) {
       variable.options.unshift({text: 'All', value: "$__all"});
+    };
+
+    this.sortVariableValues = function(options, sortOrder) {
+      if (sortOrder === 0) {
+        return options;
+      }
+
+      var sortType = Math.ceil(sortOrder / 2);
+      var reverseSort = (sortOrder % 2 === 0);
+      if (sortType === 1) {
+        options = _.sortBy(options, 'text');
+      } else if (sortType === 2) {
+        options = _.sortBy(options, function(opt) {
+          var matches = opt.text.match(/.*?(\d+).*/);
+          if (!matches) {
+            return 0;
+          } else {
+            return parseInt(matches[1], 10);
+          }
+        });
+      }
+      if (reverseSort) {
+        options = options.reverse();
+      }
+
+      return options;
     };
 
   });
