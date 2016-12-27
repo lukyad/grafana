@@ -1,0 +1,1 @@
+http://knowledge-is-wealth.com/wp/build-grafana-on-windows-32-bit-machine/
