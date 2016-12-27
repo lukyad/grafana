@@ -3,6 +3,7 @@ import {describe, beforeEach, it, sinon, expect, angularMocks} from 'test/lib/co
 import _ from 'lodash';
 import config from 'app/core/config';
 import {DashboardExporter} from '../export/exporter';
+import {DashboardModel} from '../model';
 
 describe('given dashboard with repeated panels', function() {
   var dash, exported;
@@ -42,21 +43,34 @@ describe('given dashboard with repeated panels', function() {
       repeat: 'test',
       panels: [
         {id: 2, repeat: 'apps', datasource: 'gfdb', type: 'graph'},
-        {id: 2, repeat: null, repeatPanelId: 2},
+        {id: 3, repeat: null, repeatPanelId: 2},
+        {
+          id: 4,
+          datasource: '-- Mixed --',
+          targets: [{datasource: 'other'}],
+        },
       ]
     });
+
     dash.rows.push({
       repeat: null,
       repeatRowId: 1,
       panels: [],
     });
 
-    var datasourceSrvStub = {
-      get: sinon.stub().returns(Promise.resolve({
-        name: 'gfdb',
-        meta: {id: "testdb", info: {version: "1.2.1"}, name: "TestDB"}
-      }))
-    };
+    var datasourceSrvStub = {get: sinon.stub()};
+    datasourceSrvStub.get.withArgs('gfdb').returns(Promise.resolve({
+      name: 'gfdb',
+      meta: {id: "testdb", info: {version: "1.2.1"}, name: "TestDB"}
+    }));
+    datasourceSrvStub.get.withArgs('other').returns(Promise.resolve({
+      name: 'other',
+      meta: {id: "other", info: {version: "1.2.1"}, name: "OtherDB"}
+    }));
+    datasourceSrvStub.get.withArgs('-- Mixed --').returns(Promise.resolve({
+      name: 'mixed',
+      meta: {id: "mixed", info: {version: "1.2.1"}, name: "Mixed", builtIn: true}
+    }));
 
     config.panels['graph'] = {
       id: "graph",
@@ -64,6 +78,7 @@ describe('given dashboard with repeated panels', function() {
       info: {version: "1.1.0"}
     };
 
+    dash = new DashboardModel(dash, {});
     var exporter = new DashboardExporter(datasourceSrvStub);
     exporter.makeExportable(dash).then(clean => {
       exported = clean;
@@ -72,7 +87,7 @@ describe('given dashboard with repeated panels', function() {
   });
 
   it('exported dashboard should not contain repeated panels', function() {
-    expect(exported.rows[0].panels.length).to.be(1);
+    expect(exported.rows[0].panels.length).to.be(2);
   });
 
   it('exported dashboard should not contain repeated rows', function() {
@@ -107,6 +122,16 @@ describe('given dashboard with repeated panels', function() {
     expect(require.id).to.be("testdb");
     expect(require.type).to.be("datasource");
     expect(require.version).to.be("1.2.1");
+  });
+
+  it('should not add built in datasources to required', function() {
+    var require = _.find(exported.__requires, {name: 'Mixed'});
+    expect(require).to.be(undefined);
+  });
+
+  it('should add datasources used in mixed mode', function() {
+    var require = _.find(exported.__requires, {name: 'OtherDB'});
+    expect(require).to.not.be(undefined);
   });
 
   it('should add panel to required', function() {

@@ -40,7 +40,7 @@ export function PrometheusDatasource(instanceSettings, $q, backendSrv, templateS
     return backendSrv.datasourceRequest(options);
   };
 
-  function regexEscape(value) {
+  function prometheusSpecialRegexEscape(value) {
     return value.replace(/[\\^$*+?.()|[\]{}]/g, '\\\\$&');
   }
 
@@ -51,11 +51,15 @@ export function PrometheusDatasource(instanceSettings, $q, backendSrv, templateS
     }
 
     if (typeof value === 'string') {
-      return regexEscape(value);
+      return prometheusSpecialRegexEscape(value);
     }
 
-    var escapedValues = _.map(value, regexEscape);
+    var escapedValues = _.map(value, prometheusSpecialRegexEscape);
     return escapedValues.join('|');
+  };
+
+  this.targetContainsTemplate = function(target) {
+    return templateSrv.variableExists(target.expr);
   };
 
   // Called once per panel (graph)
@@ -113,7 +117,6 @@ export function PrometheusDatasource(instanceSettings, $q, backendSrv, templateS
           throw response.error;
         }
         delete self.lastErrors.query;
-
         _.each(response.data.data.result, function(metricData) {
           result.push(self.transformMetricData(metricData, activeTargets[index], start, end));
         });
@@ -124,6 +127,10 @@ export function PrometheusDatasource(instanceSettings, $q, backendSrv, templateS
   };
 
   this.performTimeSeriesQuery = function(query, start, end) {
+    if (start > end) {
+      throw { message: 'Invalid time range' };
+    }
+
     var url = '/api/v1/query_range?query=' + encodeURIComponent(query.expr) + '&start=' + start + '&end=' + end + '&step=' + query.step;
     return this._request('GET', url, query.requestId);
   };

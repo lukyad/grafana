@@ -75,7 +75,7 @@ func (r *SqlAnnotationRepo) Find(query *annotations.ItemQuery) ([]*annotations.I
 		query.Limit = 10
 	}
 
-	sql.WriteString(fmt.Sprintf("ORDER BY epoch DESC LIMIT %v", query.Limit))
+	sql.WriteString(fmt.Sprintf(" ORDER BY epoch DESC LIMIT %v", query.Limit))
 
 	items := make([]*annotations.Item, 0)
 	if err := x.Sql(sql.String(), params...).Find(&items); err != nil {
@@ -83,4 +83,18 @@ func (r *SqlAnnotationRepo) Find(query *annotations.ItemQuery) ([]*annotations.I
 	}
 
 	return items, nil
+}
+
+func (r *SqlAnnotationRepo) Delete(params *annotations.DeleteParams) error {
+	return inTransaction(func(sess *xorm.Session) error {
+
+		sql := "DELETE FROM annotation WHERE dashboard_id = ? AND panel_id = ?"
+
+		_, err := sess.Exec(sql, params.DashboardId, params.PanelId)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
 }

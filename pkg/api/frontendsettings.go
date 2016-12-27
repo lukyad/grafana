@@ -38,7 +38,7 @@ func getFrontendSettingsMap(c *middleware.Context) (map[string]interface{}, erro
 		url := ds.Url
 
 		if ds.Access == m.DS_ACCESS_PROXY {
-			url = setting.AppSubUrl + "/api/datasources/proxy/" + strconv.FormatInt(ds.Id, 10)
+			url = "/api/datasources/proxy/" + strconv.FormatInt(ds.Id, 10)
 		}
 
 		var dsMap = map[string]interface{}{
@@ -127,6 +127,7 @@ func getFrontendSettingsMap(c *middleware.Context) (map[string]interface{}, erro
 			"name":    panel.Name,
 			"id":      panel.Id,
 			"info":    panel.Info,
+			"sort":    getPanelSort(panel.Id),
 		}
 	}
 
@@ -145,10 +146,28 @@ func getFrontendSettingsMap(c *middleware.Context) (map[string]interface{}, erro
 			"hasUpdate":     plugins.GrafanaHasUpdate,
 			"env":           setting.Env,
 		},
-		"alertingEnabled": setting.AlertingEnabled,
 	}
 
 	return jsonObj, nil
+}
+
+func getPanelSort(id string) int {
+	sort := 100
+	switch id {
+	case "graph":
+		sort = 1
+	case "singlestat":
+		sort = 2
+	case "table":
+		sort = 3
+	case "text":
+		sort = 4
+	case "alertlist":
+		sort = 5
+	case "dashlist":
+		sort = 6
+	}
+	return sort
 }
 
 func GetFrontendSettings(c *middleware.Context) {

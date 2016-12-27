@@ -25,6 +25,25 @@ func ValidateOrgAlert(c *middleware.Context) {
 	}
 }
 
+func GetAlertStatesForDashboard(c *middleware.Context) Response {
+	dashboardId := c.QueryInt64("dashboardId")
+
+	if dashboardId == 0 {
+		return ApiError(400, "Missing query parameter dashboardId", nil)
+	}
+
+	query := models.GetAlertStatesForDashboardQuery{
+		OrgId:       c.OrgId,
+		DashboardId: c.QueryInt64("dashboardId"),
+	}
+
+	if err := bus.Dispatch(&query); err != nil {
+		return ApiError(500, "Failed to fetch alert states", err)
+	}
+
+	return Json(200, query.Result)
+}
+
 // GET /api/alerts
 func GetAlerts(c *middleware.Context) Response {
 	query := models.GetAlertsQuery{
@@ -233,33 +252,30 @@ func NotificationTest(c *middleware.Context, dto dtos.NotificationTestCommand) R
 	return ApiSuccess("Test notification sent")
 }
 
-func getAlertIdForRequest(c *middleware.Context) (int64, error) {
-	alertId := c.QueryInt64("alertId")
-	panelId := c.QueryInt64("panelId")
-	dashboardId := c.QueryInt64("dashboardId")
-
-	if alertId == 0 && dashboardId == 0 && panelId == 0 {
-		return 0, fmt.Errorf("Missing alertId or dashboardId and panelId")
+//POST /api/alerts/:alertId/pause
+func PauseAlert(c *middleware.Context, dto dtos.PauseAlertCommand) Response {
+	cmd := models.PauseAlertCommand{
+		OrgId:   c.OrgId,
+		AlertId: c.ParamsInt64("alertId"),
+		Paused:  dto.Paused,
 	}
 
-	if alertId == 0 {
-		//fetch alertId
-		query := models.GetAlertsQuery{
-			OrgId:       c.OrgId,
-			DashboardId: dashboardId,
-			PanelId:     panelId,
-		}
-
-		if err := bus.Dispatch(&query); err != nil {
-			return 0, err
-		}
-
-		if len(query.Result) != 1 {
-			return 0, fmt.Errorf("PanelId is not unique on dashboard")
-		}
-
-		alertId = query.Result[0].Id
+	if err := bus.Dispatch(&cmd); err != nil {
+		return ApiError(500, "", err)
 	}
 
-	return alertId, nil
+	var response models.AlertStateType = models.AlertStateNoData
+	pausedState := "un paused"
+	if cmd.Paused {
+		response = models.AlertStatePaused
+		pausedState = "paused"
+	}
+
+	result := map[string]interface{}{
+		"alertId": cmd.AlertId,
+		"state":   response,
+		"message": "alert " + pausedState,
+	}
+
+	return Json(200, result)
 }

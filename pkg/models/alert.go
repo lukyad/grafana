@@ -8,6 +8,7 @@ import (
 
 type AlertStateType string
 type AlertSeverityType string
+type NoDataOption string
 
 const (
 	AlertStateNoData    AlertStateType = "no_data"
@@ -17,8 +18,23 @@ const (
 	AlertStateOK        AlertStateType = "ok"
 )
 
+const (
+	NoDataSetNoData   NoDataOption = "no_data"
+	NoDataSetAlerting NoDataOption = "alerting"
+	NoDataSetOK       NoDataOption = "ok"
+	NoDataKeepState   NoDataOption = "keep_state"
+)
+
 func (s AlertStateType) IsValid() bool {
 	return s == AlertStateOK || s == AlertStateNoData || s == AlertStateExecError || s == AlertStatePaused
+}
+
+func (s NoDataOption) IsValid() bool {
+	return s == NoDataSetNoData || s == NoDataSetAlerting || s == NoDataSetOK || s == NoDataKeepState
+}
+
+func (s NoDataOption) ToAlertState() AlertStateType {
+	return AlertStateType(s)
 }
 
 type Alert struct {
@@ -101,6 +117,12 @@ type SaveAlertsCommand struct {
 	Alerts []*Alert
 }
 
+type PauseAlertCommand struct {
+	OrgId   int64
+	AlertId int64
+	Paused  bool
+}
+
 type SetAlertStateCommand struct {
 	AlertId  int64
 	OrgId    int64
@@ -134,4 +156,19 @@ type GetAlertByIdQuery struct {
 	Id int64
 
 	Result *Alert
+}
+
+type GetAlertStatesForDashboardQuery struct {
+	OrgId       int64
+	DashboardId int64
+
+	Result []*AlertStateInfoDTO
+}
+
+type AlertStateInfoDTO struct {
+	Id           int64          `json:"id"`
+	DashboardId  int64          `json:"dashboardId"`
+	PanelId      int64          `json:"panelId"`
+	State        AlertStateType `json:"state"`
+	NewStateDate time.Time      `json:"newStateDate"`
 }

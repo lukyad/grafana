@@ -1,6 +1,7 @@
 package alerting
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -20,14 +21,13 @@ type EvalContext struct {
 	StartTime       time.Time
 	EndTime         time.Time
 	Rule            *Rule
-	DoneChan        chan bool
-	CancelChan      chan bool
 	log             log.Logger
 	dashboardSlug   string
 	ImagePublicUrl  string
 	ImageOnDiskPath string
 	NoDataFound     bool
-	RetryCount      int
+
+	Ctx context.Context
 }
 
 type StateDescription struct {
@@ -71,7 +71,7 @@ func (c *EvalContext) GetNotificationTitle() string {
 	return "[" + c.GetStateModel().Text + "] " + c.Rule.Name
 }
 
-func (c *EvalContext) getDashboardSlug() (string, error) {
+func (c *EvalContext) GetDashboardSlug() (string, error) {
 	if c.dashboardSlug != "" {
 		return c.dashboardSlug, nil
 	}
@@ -86,7 +86,11 @@ func (c *EvalContext) getDashboardSlug() (string, error) {
 }
 
 func (c *EvalContext) GetRuleUrl() (string, error) {
-	if slug, err := c.getDashboardSlug(); err != nil {
+	if c.IsTestRun {
+		return setting.AppUrl, nil
+	}
+
+	if slug, err := c.GetDashboardSlug(); err != nil {
 		return "", err
 	} else {
 		ruleUrl := fmt.Sprintf("%sdashboard/db/%s?fullscreen&edit&tab=alert&panelId=%d", setting.AppUrl, slug, c.Rule.PanelId)
@@ -94,24 +98,13 @@ func (c *EvalContext) GetRuleUrl() (string, error) {
 	}
 }
 
-func (c *EvalContext) GetImageUrl() (string, error) {
-	if slug, err := c.getDashboardSlug(); err != nil {
-		return "", err
-	} else {
-		ruleUrl := fmt.Sprintf("%sdashboard-solo/db/%s?&panelId=%d", setting.AppUrl, slug, c.Rule.PanelId)
-		return ruleUrl, nil
-	}
-}
-
-func NewEvalContext(rule *Rule) *EvalContext {
+func NewEvalContext(alertCtx context.Context, rule *Rule) *EvalContext {
 	return &EvalContext{
+		Ctx:         alertCtx,
 		StartTime:   time.Now(),
 		Rule:        rule,
 		Logs:        make([]*ResultLogEntry, 0),
 		EvalMatches: make([]*EvalMatch, 0),
-		DoneChan:    make(chan bool, 1),
-		CancelChan:  make(chan bool, 1),
 		log:         log.New("alerting.evalContext"),
-		RetryCount:  0,
 	}
 }

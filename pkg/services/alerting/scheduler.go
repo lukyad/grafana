@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/grafana/grafana/pkg/log"
+	"github.com/grafana/grafana/pkg/models"
 )
 
 type SchedulerImpl struct {
@@ -35,8 +36,9 @@ func (s *SchedulerImpl) Update(rules []*Rule) {
 		}
 
 		job.Rule = rule
-		job.Offset = ((rule.Frequency * 1000) / int64(len(rules))) * int64(i)
-		job.Offset = int64(math.Floor(float64(job.Offset) / 1000))
+
+		offset := ((rule.Frequency * 1000) / int64(len(rules))) * int64(i)
+		job.Offset = int64(math.Floor(float64(offset) / 1000))
 		jobs[rule.Id] = job
 	}
 
@@ -47,7 +49,7 @@ func (s *SchedulerImpl) Tick(tickTime time.Time, execQueue chan *Job) {
 	now := tickTime.Unix()
 
 	for _, job := range s.jobs {
-		if job.Running {
+		if job.Running || job.Rule.State == models.AlertStatePaused {
 			continue
 		}
 
