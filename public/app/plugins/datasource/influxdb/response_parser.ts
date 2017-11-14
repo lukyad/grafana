@@ -12,7 +12,7 @@ export default class ResponseParser {
       return [];
     }
 
-    var influxdb11format = query.toLowerCase().indexOf('show tag values') >= 0;
+    var influxdb11format = query.toLowerCase().indexOf('show tag values') >= 0 || query.toLowerCase().indexOf('select') >= 0;
 
     var res = {};
     _.each(influxResults.series, serie => {
