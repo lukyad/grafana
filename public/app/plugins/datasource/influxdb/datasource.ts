@@ -154,9 +154,9 @@ export default class InfluxDatasource {
     return false;
   }
 
-  metricFindQuery(options) {
+  metricFindQuery(query, options) {
     var timeFilter = this.getTimeFilter({rangeRaw: options.range});
-    var query = options.query.replace('$timeFilter', timeFilter);
+    var query = query.replace('$timeFilter', timeFilter);
     var interpolated = this.templateSrv.replace(query, null, 'regex');
 
     return this._seriesQuery(interpolated)
