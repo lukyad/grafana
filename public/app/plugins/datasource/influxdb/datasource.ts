@@ -155,8 +155,11 @@ export default class InfluxDatasource {
   }
 
   metricFindQuery(query, options) {
-    var timeFilter = this.getTimeFilter({rangeRaw: options.range});
-    var query = query.replace('$timeFilter', timeFilter);
+    if (options && options.range) {
+      var timeFilter = this.getTimeFilter({rangeRaw: options.range});
+      query = query.replace('$timeFilter', timeFilter);
+    }
+
     var interpolated = this.templateSrv.replace(query, null, 'regex');
 
     return this._seriesQuery(interpolated)
@@ -166,13 +169,13 @@ export default class InfluxDatasource {
   getTagKeys(options) {
     var queryBuilder = new InfluxQueryBuilder({measurement: '', tags: []}, this.database);
     var query = queryBuilder.buildExploreQuery('TAG_KEYS');
-    return this.metricFindQuery(query);
+    return this.metricFindQuery(query, options);
   }
 
   getTagValues(options) {
     var queryBuilder = new InfluxQueryBuilder({measurement: '', tags: []}, this.database);
     var query = queryBuilder.buildExploreQuery('TAG_VALUES', options.key);
-    return this.metricFindQuery(query);
+    return this.metricFindQuery(query, options);
   }
 
   _seriesQuery(query) {
