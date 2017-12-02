@@ -127,9 +127,9 @@ export class QueryVariable implements Variable {
   metricFindQuery(datasource, query) {
     var options = {range: undefined, variable: this};
 
-    if (this.refresh === 2) {
+    /**if (this.refresh === 2) {**/
       options.range = this.timeSrv.timeRange();
-    }
+    /**}**/
 
     return datasource.metricFindQuery(query, options);
   }
