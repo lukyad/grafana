@@ -83,6 +83,12 @@ function ($, core) {
           results[0].push({ hidden: true, value: 0 });
           continue;
         }
+        
+        if (series.hideFromLegend(panel.legend)) {
+          // Init value so that it does not brake series sorting
+          results[0].push({ hidden: true, value: 0 });
+          continue;
+        }
 
         hoverIndex = this.findHoverIndexFromData(pos.x, series);
         hoverDistance = pos.x - series.data[hoverIndex][0];
