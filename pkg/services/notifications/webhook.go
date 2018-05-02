@@ -5,11 +5,12 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
+	"time"
 
 	"golang.org/x/net/context/ctxhttp"
 
-	"github.com/grafana/grafana/pkg/log"
 	"github.com/grafana/grafana/pkg/util"
 )
 
@@ -19,34 +20,24 @@ type Webhook struct {
 	Password   string
 	Body       string
 	HttpMethod string
+	HttpHeader map[string]string
 }
 
-var (
-	webhookQueue chan *Webhook
-	webhookLog   log.Logger
-)
-
-func initWebhookQueue() {
-	webhookLog = log.New("notifications.webhook")
-	webhookQueue = make(chan *Webhook, 10)
-	go processWebhookQueue()
+var netTransport = &http.Transport{
+	Proxy: http.ProxyFromEnvironment,
+	Dial: (&net.Dialer{
+		Timeout:   30 * time.Second,
+		DualStack: true,
+	}).Dial,
+	TLSHandshakeTimeout: 5 * time.Second,
+}
+var netClient = &http.Client{
+	Timeout:   time.Second * 30,
+	Transport: netTransport,
 }
 
-func processWebhookQueue() {
-	for {
-		select {
-		case webhook := <-webhookQueue:
-			err := sendWebRequestSync(context.TODO(), webhook)
-
-			if err != nil {
-				webhookLog.Error("Failed to send webrequest ", "error", err)
-			}
-		}
-	}
-}
-
-func sendWebRequestSync(ctx context.Context, webhook *Webhook) error {
-	webhookLog.Debug("Sending webhook", "url", webhook.Url, "http method", webhook.HttpMethod)
+func (ns *NotificationService) sendWebRequestSync(ctx context.Context, webhook *Webhook) error {
+	ns.log.Debug("Sending webhook", "url", webhook.Url, "http method", webhook.HttpMethod)
 
 	if webhook.HttpMethod == "" {
 		webhook.HttpMethod = http.MethodPost
@@ -63,7 +54,11 @@ func sendWebRequestSync(ctx context.Context, webhook *Webhook) error {
 		request.Header.Add("Authorization", util.GetBasicAuthHeader(webhook.User, webhook.Password))
 	}
 
-	resp, err := ctxhttp.Do(ctx, http.DefaultClient, request)
+	for k, v := range webhook.HttpHeader {
+		request.Header.Set(k, v)
+	}
+
+	resp, err := ctxhttp.Do(ctx, netClient, request)
 	if err != nil {
 		return err
 	}
@@ -78,10 +73,6 @@ func sendWebRequestSync(ctx context.Context, webhook *Webhook) error {
 		return err
 	}
 
-	webhookLog.Debug("Webhook failed", "statuscode", resp.Status, "body", string(body))
+	ns.log.Debug("Webhook failed", "statuscode", resp.Status, "body", string(body))
 	return fmt.Errorf("Webhook response status %v", resp.Status)
-}
-
-var addToWebhookQueue = func(msg *Webhook) {
-	webhookQueue <- msg
 }

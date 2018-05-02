@@ -15,10 +15,22 @@ type Notifier interface {
 	Notify(evalContext *EvalContext) error
 	GetType() string
 	NeedsImage() bool
-	PassesFilter(rule *Rule) bool
+	ShouldNotify(evalContext *EvalContext) bool
 
 	GetNotifierId() int64
 	GetIsDefault() bool
+}
+
+type NotifierSlice []Notifier
+
+func (notifiers NotifierSlice) ShouldUploadImage() bool {
+	for _, notifier := range notifiers {
+		if notifier.NeedsImage() {
+			return true
+		}
+	}
+
+	return false
 }
 
 type ConditionResult struct {

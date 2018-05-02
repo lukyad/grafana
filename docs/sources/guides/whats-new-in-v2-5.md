@@ -3,11 +3,6 @@ title = "What's New in Grafana v2.5"
 description = "Feature & improvement highlights for Grafana v2.5"
 keywords = ["grafana", "new", "documentation", "2.5"]
 type = "docs"
-[menu.docs]
-name = "Version 2.5"
-identifier = "v2.5"
-parent = "whatsnew"
-weight = 9
 +++
 
 # What's new in Grafana v2.5
@@ -107,5 +102,5 @@ view the [CHANGELOG.md](https://github.com/grafana/grafana/blob/master/CHANGELOG
 
 - - -
 
-### <a href="http://grafana.org/download">Download Grafana 2.5 now</a>
+### <a href="https://grafana.com/get">Download Grafana 2.5 now</a>
 

@@ -49,10 +49,11 @@ func handleAlertTestCommand(cmd *AlertTestCommand) error {
 func testAlertRule(rule *Rule) *EvalContext {
 	handler := NewEvalHandler()
 
-	context := NewEvalContext(context.TODO(), rule)
+	context := NewEvalContext(context.Background(), rule)
 	context.IsTestRun = true
 
 	handler.Eval(context)
+	context.Rule.State = context.GetNewState()
 
 	return context
 }

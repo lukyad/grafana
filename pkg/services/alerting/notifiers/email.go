@@ -6,14 +6,27 @@ import (
 
 	"github.com/grafana/grafana/pkg/bus"
 	"github.com/grafana/grafana/pkg/log"
-	"github.com/grafana/grafana/pkg/metrics"
 	m "github.com/grafana/grafana/pkg/models"
 	"github.com/grafana/grafana/pkg/services/alerting"
 	"github.com/grafana/grafana/pkg/setting"
 )
 
 func init() {
-	alerting.RegisterNotifier("email", NewEmailNotifier)
+	alerting.RegisterNotifier(&alerting.NotifierPlugin{
+		Type:        "email",
+		Name:        "Email",
+		Description: "Sends notifications using Grafana server configured SMTP settings",
+		Factory:     NewEmailNotifier,
+		OptionsTemplate: `
+      <h3 class="page-heading">Email addresses</h3>
+      <div class="gf-form">
+         <textarea rows="7" class="gf-form-input width-27" required ng-model="ctrl.model.settings.addresses"></textarea>
+      </div>
+      <div class="gf-form">
+      <span>You can enter multiple email addresses using a ";" separator</span>
+      </div>
+    `,
+	})
 }
 
 type EmailNotifier struct {
@@ -47,12 +60,16 @@ func NewEmailNotifier(model *m.AlertNotification) (alerting.Notifier, error) {
 
 func (this *EmailNotifier) Notify(evalContext *alerting.EvalContext) error {
 	this.log.Info("Sending alert notification to", "addresses", this.Addresses)
-	metrics.M_Alerting_Notification_Sent_Email.Inc(1)
 
 	ruleUrl, err := evalContext.GetRuleUrl()
 	if err != nil {
 		this.log.Error("Failed get rule link", "error", err)
 		return err
+	}
+
+	error := ""
+	if evalContext.Error != nil {
+		error = evalContext.Error.Error()
 	}
 
 	cmd := &m.SendEmailCommandSync{
@@ -64,6 +81,7 @@ func (this *EmailNotifier) Notify(evalContext *alerting.EvalContext) error {
 				"Name":         evalContext.Rule.Name,
 				"StateModel":   evalContext.GetStateModel(),
 				"Message":      evalContext.Rule.Message,
+				"Error":        error,
 				"RuleUrl":      ruleUrl,
 				"ImageLink":    "",
 				"EmbededImage": "",

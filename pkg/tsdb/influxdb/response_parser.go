@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/grafana/grafana/pkg/components/null"
 	"github.com/grafana/grafana/pkg/tsdb"
-	"gopkg.in/guregu/null.v3"
 )
 
 type ResponseParser struct{}
@@ -50,6 +50,7 @@ func (rp *ResponseParser) transformRows(rows []Row, queryResult *tsdb.QueryResul
 			result = append(result, &tsdb.TimeSeries{
 				Name:   rp.formatSerieName(row, column, query),
 				Points: points,
+				Tags:   row.Tags,
 			})
 		}
 	}

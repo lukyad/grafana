@@ -16,64 +16,33 @@ type ResultHandler interface {
 }
 
 type DefaultResultHandler struct {
-	notifier Notifier
+	notifier NotificationService
 	log      log.Logger
 }
 
 func NewResultHandler() *DefaultResultHandler {
 	return &DefaultResultHandler{
 		log:      log.New("alerting.resultHandler"),
-		notifier: NewRootNotifier(),
+		notifier: NewNotificationService(),
 	}
-}
-
-func (handler *DefaultResultHandler) GetStateFromEvaluation(evalContext *EvalContext) m.AlertStateType {
-	if evalContext.Error != nil {
-		handler.log.Error("Alert Rule Result Error",
-			"ruleId", evalContext.Rule.Id,
-			"name", evalContext.Rule.Name,
-			"error", evalContext.Error,
-			"changing state to", evalContext.Rule.ExecutionErrorState.ToAlertState())
-
-		if evalContext.Rule.ExecutionErrorState == m.ExecutionErrorKeepState {
-			return evalContext.PrevAlertState
-		} else {
-			return evalContext.Rule.ExecutionErrorState.ToAlertState()
-		}
-	} else if evalContext.Firing {
-		return m.AlertStateAlerting
-	} else if evalContext.NoDataFound {
-		handler.log.Info("Alert Rule returned no data",
-			"ruleId", evalContext.Rule.Id,
-			"name", evalContext.Rule.Name,
-			"changing state to", evalContext.Rule.NoDataState.ToAlertState())
-
-		if evalContext.Rule.NoDataState == m.NoDataKeepState {
-			return evalContext.PrevAlertState
-		} else {
-			return evalContext.Rule.NoDataState.ToAlertState()
-		}
-	}
-
-	return m.AlertStateOK
 }
 
 func (handler *DefaultResultHandler) Handle(evalContext *EvalContext) error {
 	executionError := ""
 	annotationData := simplejson.New()
 
-	evalContext.Rule.State = handler.GetStateFromEvaluation(evalContext)
+	if len(evalContext.EvalMatches) > 0 {
+		annotationData.Set("evalMatches", simplejson.NewFromAny(evalContext.EvalMatches))
+	}
 
 	if evalContext.Error != nil {
 		executionError = evalContext.Error.Error()
-		annotationData.Set("errorMessage", executionError)
+		annotationData.Set("error", executionError)
+	} else if evalContext.NoDataFound {
+		annotationData.Set("noData", true)
 	}
 
-	if evalContext.Firing {
-		annotationData = simplejson.NewFromAny(evalContext.EvalMatches)
-	}
-
-	countStateResult(evalContext.Rule.State)
+	metrics.M_Alerting_Result_State.WithLabelValues(string(evalContext.Rule.State)).Inc()
 	if evalContext.ShouldUpdateAlertState() {
 		handler.log.Info("New state change", "alertId", evalContext.Rule.Id, "newState", evalContext.Rule.State, "prev state", evalContext.PrevAlertState)
 
@@ -87,9 +56,15 @@ func (handler *DefaultResultHandler) Handle(evalContext *EvalContext) error {
 
 		if err := bus.Dispatch(cmd); err != nil {
 			if err == m.ErrCannotChangeStateOnPausedAlert {
-				handler.log.Error("Cannot change state on alert thats pause", "error", err)
+				handler.log.Error("Cannot change state on alert that's paused", "error", err)
 				return err
 			}
+
+			if err == m.ErrRequiresNewState {
+				handler.log.Info("Alert already updated")
+				return nil
+			}
+
 			handler.log.Error("Failed to save state", "error", err)
 		}
 
@@ -98,13 +73,11 @@ func (handler *DefaultResultHandler) Handle(evalContext *EvalContext) error {
 			OrgId:       evalContext.Rule.OrgId,
 			DashboardId: evalContext.Rule.DashboardId,
 			PanelId:     evalContext.Rule.PanelId,
-			Type:        annotations.AlertType,
 			AlertId:     evalContext.Rule.Id,
-			Title:       evalContext.Rule.Name,
-			Text:        evalContext.GetStateModel().Text,
+			Text:        "",
 			NewState:    string(evalContext.Rule.State),
 			PrevState:   string(evalContext.PrevAlertState),
-			Epoch:       time.Now().Unix(),
+			Epoch:       time.Now().UnixNano() / int64(time.Millisecond),
 			Data:        annotationData,
 		}
 
@@ -112,26 +85,9 @@ func (handler *DefaultResultHandler) Handle(evalContext *EvalContext) error {
 		if err := annotationRepo.Save(&item); err != nil {
 			handler.log.Error("Failed to save annotation for new alert state", "error", err)
 		}
-
-		if evalContext.ShouldSendNotification() {
-			handler.notifier.Notify(evalContext)
-		}
 	}
+
+	handler.notifier.SendIfNeeded(evalContext)
 
 	return nil
-}
-
-func countStateResult(state m.AlertStateType) {
-	switch state {
-	case m.AlertStatePending:
-		metrics.M_Alerting_Result_State_Pending.Inc(1)
-	case m.AlertStateAlerting:
-		metrics.M_Alerting_Result_State_Alerting.Inc(1)
-	case m.AlertStateOK:
-		metrics.M_Alerting_Result_State_Ok.Inc(1)
-	case m.AlertStatePaused:
-		metrics.M_Alerting_Result_State_Paused.Inc(1)
-	case m.AlertStateNoData:
-		metrics.M_Alerting_Result_State_NoData.Inc(1)
-	}
 }

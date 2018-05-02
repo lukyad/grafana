@@ -10,36 +10,39 @@ import (
 
 func TestInterval(t *testing.T) {
 	Convey("Default interval ", t, func() {
-		setting.NewConfigContext(&setting.CommandLineArgs{
+		cfg := setting.NewCfg()
+		cfg.Load(&setting.CommandLineArgs{
 			HomePath: "../../",
 		})
+
+		calculator := NewIntervalCalculator(&IntervalOptions{})
 
 		Convey("for 5min", func() {
 			tr := NewTimeRange("5m", "now")
 
-			interval := CalculateInterval(tr)
-			So(interval, ShouldEqual, "200ms")
+			interval := calculator.Calculate(tr, time.Millisecond*1)
+			So(interval.Text, ShouldEqual, "200ms")
 		})
 
 		Convey("for 15min", func() {
 			tr := NewTimeRange("15m", "now")
 
-			interval := CalculateInterval(tr)
-			So(interval, ShouldEqual, "500ms")
+			interval := calculator.Calculate(tr, time.Millisecond*1)
+			So(interval.Text, ShouldEqual, "500ms")
 		})
 
 		Convey("for 30min", func() {
 			tr := NewTimeRange("30m", "now")
 
-			interval := CalculateInterval(tr)
-			So(interval, ShouldEqual, "1s")
+			interval := calculator.Calculate(tr, time.Millisecond*1)
+			So(interval.Text, ShouldEqual, "1s")
 		})
 
 		Convey("for 1h", func() {
 			tr := NewTimeRange("1h", "now")
 
-			interval := CalculateInterval(tr)
-			So(interval, ShouldEqual, "2s")
+			interval := calculator.Calculate(tr, time.Millisecond*1)
+			So(interval.Text, ShouldEqual, "2s")
 		})
 
 		Convey("Round interval", func() {
@@ -51,6 +54,7 @@ func TestInterval(t *testing.T) {
 			So(formatDuration(time.Second*61), ShouldEqual, "1m")
 			So(formatDuration(time.Millisecond*30), ShouldEqual, "30ms")
 			So(formatDuration(time.Hour*23), ShouldEqual, "23h")
+			So(formatDuration(time.Hour*24), ShouldEqual, "1d")
 			So(formatDuration(time.Hour*24*367), ShouldEqual, "1y")
 		})
 	})

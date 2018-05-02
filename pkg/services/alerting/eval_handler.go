@@ -38,6 +38,11 @@ func (e *DefaultEvalHandler) Eval(context *EvalContext) {
 			break
 		}
 
+		if i == 0 {
+			firing = cr.Firing
+			noDataFound = cr.NoDataFound
+		}
+
 		// calculating Firing based on operator
 		if cr.Operator == "or" {
 			firing = firing || cr.Firing
@@ -60,6 +65,7 @@ func (e *DefaultEvalHandler) Eval(context *EvalContext) {
 	context.Firing = firing
 	context.NoDataFound = noDataFound
 	context.EndTime = time.Now()
-	elapsedTime := context.EndTime.Sub(context.StartTime) / time.Millisecond
-	metrics.M_Alerting_Execution_Time.Update(elapsedTime)
+
+	elapsedTime := context.EndTime.Sub(context.StartTime).Nanoseconds() / int64(time.Millisecond)
+	metrics.M_Alerting_Execution_Time.Observe(float64(elapsedTime))
 }

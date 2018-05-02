@@ -1,10 +1,9 @@
-///<reference path="../../../headers/common.d.ts" />
-
 export class ConfigCtrl {
   static template = '';
 
   appEditCtrl: any;
 
+  /** @ngInject **/
   constructor(private backendSrv) {
     this.appEditCtrl.setPreUpdateHook(this.initDatasource.bind(this));
   }
@@ -13,7 +12,7 @@ export class ConfigCtrl {
     return this.backendSrv.get('/api/datasources').then(res => {
       var found = false;
       for (let ds of res) {
-        if (ds.type === "grafana-testdata-datasource") {
+        if (ds.type === 'grafana-testdata-datasource') {
           found = true;
         }
       }
@@ -23,7 +22,7 @@ export class ConfigCtrl {
           name: 'Grafana TestData',
           type: 'grafana-testdata-datasource',
           access: 'direct',
-          jsonData: {}
+          jsonData: {},
         };
 
         return this.backendSrv.post('/api/datasources', dsInstance);
@@ -33,4 +32,3 @@ export class ConfigCtrl {
     });
   }
 }
-
